@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fallow</title>
+<meta name="description" content="Fallow sorts your Downloads folder into keep, archive and delete. Classification runs on your own machine and costs nothing.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=Schibsted+Grotesk:wght@400;500;600&family=Young+Serif&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #e8ecdf;
+    --ink: #1c2a21;
+    --muted: #54645a;
+    --rule: #c3cbb7;
+    --keep: #4f8a4b;
+    --archive: #d9b43f;
+    --delete: #5a3e2b;
+    --panel: #1d2b22;
+    --panel-ink: #dbe5d0;
+    --serif: "Young Serif", Georgia, "Times New Roman", serif;
+    --sans: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 400 1.0625rem/1.6 var(--sans);
+  }
+  .wrap { max-width: 64rem; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
+  .wrap > section { margin-top: 5.5rem; }
+  a, button { color: inherit; }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  .mark { font: 1.25rem/1 var(--serif); margin: 0 0 4rem; }
+  h1, h2 { font-family: var(--serif); font-weight: 400; margin: 0; letter-spacing: -0.015em; }
+  h1 { font-size: clamp(2.1rem, 5.4vw, 3.6rem); line-height: 1.08; max-width: 18ch; }
+  h2 { font-size: 1.6rem; line-height: 1.2; }
+  p { margin: 0; }
+  .lede { margin-top: 1.5rem; max-width: 40rem; font-size: 1.1875rem; line-height: 1.55; }
+
+  /* the field map */
+  .field { margin-top: 3rem; }
+  .map {
+    display: grid; grid-template-columns: repeat(25, 1fr); gap: 3px;
+  }
+  .cell { display: block; aspect-ratio: 1; transition: opacity .18s ease; }
+  .cell.k { background: var(--keep); }
+  .cell.a { background: var(--archive); }
+  .cell.d { background: var(--delete); }
+  .key {
+    display: flex; flex-wrap: wrap; gap: .5rem 2rem; list-style: none;
+    margin: 1.25rem 0 0; padding: 0;
+  }
+  .key button {
+    display: inline-flex; align-items: center; gap: .6rem; padding: .35rem 0;
+    background: none; border: 0; font: inherit; cursor: pointer;
+  }
+  .key i { width: .95rem; height: .95rem; display: block; }
+  .key b { font-weight: 600; }
+  .key [data-k="k"] i { background: var(--keep); }
+  .key [data-k="a"] i { background: var(--archive); }
+  .key [data-k="d"] i { background: var(--delete); }
+  .field:has([data-k="k"]:is(:hover, :focus-visible)) .cell:not(.k),
+  .field:has([data-k="a"]:is(:hover, :focus-visible)) .cell:not(.a),
+  .field:has([data-k="d"]:is(:hover, :focus-visible)) .cell:not(.d) { opacity: .16; }
+  .caption { margin-top: .75rem; color: var(--muted); font-size: .9375rem; max-width: 40rem; }
+
+  /* the one moment: the field fills in as a sweep, left to right */
+  @media (prefers-reduced-motion: no-preference) {
+    .cell { animation: settle .5s cubic-bezier(.2, .7, .2, 1) backwards; }
+    @keyframes settle { from { opacity: 0; transform: scale(.35); } to { opacity: 1; transform: none; } }
+  .cell:nth-child(25n+1) { animation-delay: 0ms; }
+  .cell:nth-child(25n+2) { animation-delay: 24ms; }
+  .cell:nth-child(25n+3) { animation-delay: 48ms; }
+  .cell:nth-child(25n+4) { animation-delay: 72ms; }
+  .cell:nth-child(25n+5) { animation-delay: 96ms; }
+  .cell:nth-child(25n+6) { animation-delay: 120ms; }
+  .cell:nth-child(25n+7) { animation-delay: 144ms; }
+  .cell:nth-child(25n+8) { animation-delay: 168ms; }
+  .cell:nth-child(25n+9) { animation-delay: 192ms; }
+  .cell:nth-child(25n+10) { animation-delay: 216ms; }
+  .cell:nth-child(25n+11) { animation-delay: 240ms; }
+  .cell:nth-child(25n+12) { animation-delay: 264ms; }
+  .cell:nth-child(25n+13) { animation-delay: 288ms; }
+  .cell:nth-child(25n+14) { animation-delay: 312ms; }
+  .cell:nth-child(25n+15) { animation-delay: 336ms; }
+  .cell:nth-child(25n+16) { animation-delay: 360ms; }
+  .cell:nth-child(25n+17) { animation-delay: 384ms; }
+  .cell:nth-child(25n+18) { animation-delay: 408ms; }
+  .cell:nth-child(25n+19) { animation-delay: 432ms; }
+  .cell:nth-child(25n+20) { animation-delay: 456ms; }
+  .cell:nth-child(25n+21) { animation-delay: 480ms; }
+  .cell:nth-child(25n+22) { animation-delay: 504ms; }
+  .cell:nth-child(25n+23) { animation-delay: 528ms; }
+  .cell:nth-child(25n+24) { animation-delay: 552ms; }
+  .cell:nth-child(25n+25) { animation-delay: 576ms; }
+  }
+
+  .two { display: grid; gap: 1.5rem 4rem; grid-template-columns: 1fr; }
+  .two p { max-width: 34rem; }
+  .two p + p { margin-top: 1rem; }
+  @media (min-width: 52rem) { .two { grid-template-columns: 12rem 1fr; } }
+
+  /* report */
+  .head p { margin-top: .5rem; color: var(--muted); max-width: 40rem; }
+  pre {
+    margin: 1.5rem 0 0; padding: 1.5rem 1.5rem 1.75rem; overflow-x: auto;
+    background: var(--panel); color: var(--panel-ink);
+    font: 400 .9375rem/1.65 var(--mono); tab-size: 2;
+  }
+  pre .sum { color: var(--archive); }
+  @media (max-width: 40rem) { pre { font-size: .75rem; padding: 1.1rem 1rem 1.25rem; } }
+
+  /* rename proposals */
+  table { width: 100%; margin-top: 1.5rem; border-collapse: collapse; }
+  th, td { text-align: left; vertical-align: top; padding: .9rem 1rem .9rem 0; border-bottom: 1px solid var(--rule); }
+  th { font-weight: 600; font-size: .9375rem; border-bottom: 2px solid var(--ink); }
+  td.old { color: var(--muted); font-family: var(--mono); font-size: .9375rem; }
+  td.new { font-family: var(--mono); font-size: .9375rem; font-weight: 400; }
+  @media (max-width: 40rem) {
+    thead { position: absolute; left: -9999px; }
+    tr, td { display: block; }
+    tr { padding: .9rem 0; border-bottom: 1px solid var(--rule); }
+    td { border: 0; padding: .15rem 0; }
+    td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: .875rem; }
+    td.old, td.new { word-break: break-all; }
+  }
+
+  .demo {
+    margin-top: 1.75rem; padding: .6rem 0 .6rem 1rem; max-width: 40rem;
+    border-left: 4px solid var(--archive); color: var(--muted); font-size: .9375rem;
+  }
+  footer { margin-top: 5.5rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .9375rem; }
+  code { font: .9em var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="mark">Fallow</p>
+    <h1>Every file in your Downloads, sorted into keep, archive or delete.</h1>
+    <p class="lede">Label about 200 files by hand. Fallow learns your calls, then sorts the rest on your own computer. It only suggests: it never moves, renames or deletes a file.</p>
+  </header>
+
+  <section class="field" aria-labelledby="map-title">
+    <h2 id="map-title" class="sr" style="position:absolute;left:-9999px">Field map of your files</h2>
+    <div class="map" role="img" aria-label="Map of 260 files: 231 keep, 9 archive, 20 delete"><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i></div>
+    <ul class="key">
+      <li><button type="button" data-k="k"><i></i><span><b>231</b> keep</span></button></li>
+      <li><button type="button" data-k="a"><i></i><span><b>9</b> archive</span></button></li>
+      <li><button type="button" data-k="d"><i></i><span><b>20</b> delete</span></button></li>
+    </ul>
+    <p class="caption">One square per file. Point at a count to find its files.</p>
+    <p class="demo"> </p>
+  </section>
+
+  <section class="two">
+    <h2>How it works</h2>
+    <div>
+      <p>Fallow reads each file's size, age, type, folder and name. It never opens the file itself. From the files you label, it learns what you tend to keep, archive or delete, and predicts the rest.</p>
+      <p>Classification runs entirely on your machine and costs nothing. Nothing leaves it unless you switch on an optional extra.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="report-title">
+    <div class="head">
+      <h2 id="report-title">The report</h2>
+      <p>Plain text from <code>python -m fallow.report</code>.</p>
+    </div>
+    <pre>FALLOW REPORT
+=============
+Files analysed: 260
+
+Predicted action:
+  archive      9
+  keep       231
+  delete      20
+
+Reclaimable space (predicted delete): 0.01 GB
+
+10 oldest archive candidates:
+   1. file_0221.zip  (750 days, 639.1 KB)
+   2. file_0225.zip  (750 days, 882.7 KB)
+   3. file_0226.zip  (750 days, 225.1 KB)
+   4. file_0228.pdf  (750 days, 251.7 KB)
+   5. file_0233.zip  (750 days, 968.7 KB)
+   6. file_0249.zip  (750 days, 446.2 KB)
+   7. file_0251.zip  (750 days, 379.4 KB)
+   8. file_0257.pdf  (750 days, 546.5 KB)
+   9. file_0260.pdf  (750 days, 153.8 KB)
+
+<span class="sum">Fallow triaged 260 files and found 0.01 GB that can likely be deleted.</span></pre>
+  </section>
+
+
+
+  <footer>Start with <code>python -m fallow.collect --dir ~/Downloads</code>. Every step is in the README.</footer>
+</div>
+</body>
+</html>
