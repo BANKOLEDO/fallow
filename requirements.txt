@@ -1,0 +1,11 @@
+# Core: enough to run every step that needs no key
+pandas
+numpy
+scikit-learn
+python-dotenv
+requests
+# Optional extras, install only what you want:
+#   tabpfn          local TabPFN (accept the model licence first)
+#   tabpfn-client   hosted TabPFN fallback
+#   openai          report prose via Ultramarine
+#   sentry-sdk      tracing
