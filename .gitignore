@@ -1,0 +1,16 @@
+# secrets
+.env
+
+# your data: these files list real paths and names from your computer
+fallow_data.csv
+fallow_predictions.csv
+fallow_renames.csv
+fallow_report.md
+out.mp3
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
