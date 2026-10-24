@@ -2,7 +2,7 @@ import csv
 import random
 
 COLUMNS = ["path", "name", "ext", "size_bytes", "age_days", "mtime_days", "is_hidden",
-           "parent_folder", "depth", "name_len", "has_number_in_name", "label"]
+           "parent_folder", "depth", "name_len", "has_number_in_name", "label", "label_source"]
 
 
 def make_rows(n=120, labelled=100, seed=0):
@@ -20,7 +20,7 @@ def make_rows(n=120, labelled=100, seed=0):
             "mtime_days": round(age, 2), "is_hidden": 0,
             "parent_folder": rnd.choice(["Downloads", "old"]), "depth": 0,
             "name_len": len(name), "has_number_in_name": 1,
-            "label": label if i < labelled else "",
+            "label": label if i < labelled else "", "label_source": "",
         })
     return rows
 
