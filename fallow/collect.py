@@ -13,8 +13,12 @@ MAX_FILES = 2000
 COLUMNS = [
     "path", "name", "ext", "size_bytes", "age_days", "mtime_days",
     "is_hidden", "parent_folder", "depth", "name_len",
-    "has_number_in_name", "label",
+    "has_number_in_name", "label", "label_source",
 ]
+
+DELETE_EXTS = {"tmp", "log", "cache", "bak", "old", "swp", "part", "crdownload"}
+ARCHIVE_EXTS = {"zip", "dmg", "iso", "rar", "7z", "bak", "old"}
+KEEP_EXTS = {"jpg", "jpeg", "png", "gif", "webp", "mp4", "mov", "docx", "xlsx", "pptx", "pdf"}
 
 
 def human(n: float) -> str:
@@ -24,7 +28,23 @@ def human(n: float) -> str:
         n /= 1024
 
 
-def collect(root: Path):
+def autolabel_row(row: dict) -> tuple:
+    """Heuristic pre-label for obvious files. Returns (label, source)."""
+    ext = (row.get("ext") or "").lower()
+    try:
+        age = float(row.get("age_days") or 0)
+    except (TypeError, ValueError):
+        age = 0
+    if ext in DELETE_EXTS:
+        return "3", "auto"
+    if age > 365 and ext in ARCHIVE_EXTS:
+        return "1", "auto"
+    if age <= 30 and ext in KEEP_EXTS:
+        return "2", "auto"
+    return "", ""
+
+
+def collect(root: Path, autolabel: bool = False):
     now = time.time()
     records, scanned, skipped = [], 0, 0
     for dirpath, dirnames, filenames in os.walk(root, onerror=lambda e: print(f"[WARN] cannot read {e.filename}: {e.strerror}")):
@@ -61,8 +81,14 @@ def collect(root: Path):
                 "name_len": len(fname),
                 "has_number_in_name": int(bool(re.search(r"\d", fname))),
                 "label": "",
+                "label_source": "",
                 "_mtime": st.st_mtime,
             })
+            if autolabel:
+                label, source = autolabel_row(records[-1])
+                if label:
+                    records[-1]["label"] = label
+                    records[-1]["label_source"] = source
     return records, scanned, skipped
 
 
@@ -80,6 +106,8 @@ def main() -> int:
     ap.add_argument("--dir", default="~/Downloads", help="directory to scan")
     ap.add_argument("--out", default="fallow_data.csv", help="output CSV")
     ap.add_argument("--force", action="store_true", help="overwrite --out even if it holds labels")
+    ap.add_argument("--autolabel", action="store_true",
+                    help="pre-label obvious files (temp/cache->delete, old archives->archive, recent media/docs->keep)")
     args = ap.parse_args()
 
     n_labels = existing_labels(args.out)
@@ -94,11 +122,15 @@ def main() -> int:
         return 1
 
     print(f"Scanning {root} ...", flush=True)
-    records, scanned, skipped = collect(root)
+    records, scanned, skipped = collect(root, autolabel=args.autolabel)
 
     records.sort(key=lambda r: r["_mtime"], reverse=True)  # newest first
     capped = len(records) > MAX_FILES
     records = records[:MAX_FILES]
+
+    if args.autolabel:
+        n_auto = sum(1 for r in records if r.get("label_source") == "auto")
+        print(f"Auto-labelled: {n_auto} obvious files (review the rest with: python -m fallow.label --review)")
 
     with open(args.out, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=COLUMNS, extrasaction="ignore")
