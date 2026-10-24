@@ -39,3 +39,23 @@ def test_prints_200_label_notice_once(tmp_path, monkeypatch, capsys):
     write_csv(p, make_rows(203, labelled=198))
     run(monkeypatch, p, ["1", "1", "1", "1", "1", "q"])
     assert capsys.readouterr().out.count("200 labels reached") == 1
+
+
+def test_review_only_prompts_unlabeled(tmp_path, monkeypatch, capsys):
+    p = tmp_path / "d.csv"
+    rows = make_rows(4, labelled=0)
+    rows[0]["label"] = "2"; rows[0]["label_source"] = ""          # user-labelled
+    rows[1]["label"] = "1"; rows[1]["label_source"] = "auto"      # auto-labelled
+    rows[2]["label"] = "3"; rows[2]["label_source"] = ""          # user-labelled
+    # only row index 3 is unlabeled -> should be prompted
+    write_csv(p, rows)
+    it = iter(["1", "q"])
+    monkeypatch.setattr(label, "getkey", lambda: next(it))
+    monkeypatch.setattr(sys, "argv", ["label", "--file", str(p), "--review"])
+    rc = label.main()
+    assert rc == 0
+    text = capsys.readouterr().out
+    assert "auto" in text
+    prompt_lines = [l for l in text.splitlines() if l.startswith("[") and "] " in l]
+    assert len(prompt_lines) == 1
+    assert "[3]" in prompt_lines[0]
