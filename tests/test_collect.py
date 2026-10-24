@@ -1,6 +1,7 @@
 import csv
 import os
 import sys
+import time
 
 from fallow import collect
 from tests.helpers import make_rows, write_csv
@@ -57,3 +58,24 @@ def test_refuses_to_erase_labels_unless_forced(tmp_path, monkeypatch, capsys):
     assert "4 labels" in capsys.readouterr().out
     assert sum(1 for r in csv.DictReader(open(out)) if r["label"]) == 4  # untouched
     assert run(monkeypatch, "--dir", str(root), "--out", str(out), "--force") == 0
+
+
+def test_autolabel_marks_obvious_files(tmp_path, monkeypatch):
+    root = tmp_path / "scan"
+    root.mkdir()
+    (root / "cache.tmp").write_text("x")
+    (root / "old.zip").write_text("x")
+    (root / "recent.jpg").write_text("x")
+    (root / "mystery.xyz").write_text("x")
+    import os
+    old_mtime = time.time() - 400 * 86400
+    recent_mtime = time.time() - 5 * 86400
+    os.utime(root / "old.zip", (old_mtime, old_mtime))
+    os.utime(root / "recent.jpg", (recent_mtime, recent_mtime))
+    out = tmp_path / "out.csv"
+    assert run(monkeypatch, "--dir", str(root), "--out", str(out), "--autolabel") == 0
+    by = {r["name"]: r for r in csv.DictReader(open(out))}
+    assert by["cache.tmp"]["label"] == "3" and by["cache.tmp"]["label_source"] == "auto"
+    assert by["old.zip"]["label"] == "1" and by["old.zip"]["label_source"] == "auto"
+    assert by["recent.jpg"]["label"] == "2" and by["recent.jpg"]["label_source"] == "auto"
+    assert by["mystery.xyz"]["label"] == "" and by["mystery.xyz"]["label_source"] == ""
