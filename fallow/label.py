@@ -69,6 +69,8 @@ def getkey() -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Fallow step 2: label files by hand.")
     ap.add_argument("--file", default="fallow_data.csv")
+    ap.add_argument("--review", action="store_true",
+                    help="review-only mode: skip auto-labelled rows, only prompt for unlabeled (ambiguous) files")
     args = ap.parse_args()
 
     if not os.path.exists(args.file):
@@ -77,8 +79,10 @@ def main() -> int:
 
     fields, rows = read_rows(args.file)
     labelled = sum(1 for r in rows if r["label"].strip())
+    auto_labeled = sum(1 for r in rows if r.get("label_source") == "auto")
+    user_labeled = labelled - auto_labeled
     todo = [i for i, r in enumerate(rows) if not r["label"].strip()]
-    print(f"{len(rows)} rows, {labelled} already labelled, {len(todo)} to go.")
+    print(f"{len(rows)} rows, {labelled} labelled ({user_labeled} by you, {auto_labeled} auto), {len(todo)} to review.")
     print("Keys: 1=archive  2=keep  3=delete  s=skip  q=quit\n")
 
     session = 0
