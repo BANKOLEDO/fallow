@@ -63,7 +63,7 @@ def _try_local_tabpfn(Xtr, ytr, Xall):
     print("[INFO] fitting TabPFN locally on CPU (can take a few minutes) ...", flush=True)
     clf = TabPFNClassifier(device="cpu")
     clf.fit(Xtr, ytr)
-    return "TabPFN (local)", clf.classes_, clf.predict_proba(Xall)
+    return "TabPFN (local)", clf.classes_, clf.predict_proba(Xall), clf
 
 
 def _try_tabpfn_api(Xtr, ytr, Xall):
@@ -77,11 +77,11 @@ def _try_tabpfn_api(Xtr, ytr, Xall):
         tabpfn_client.set_access_token(token)
         clf = TabPFNClassifier()
         clf.fit(Xtr, ytr)
-        return clf.classes_, clf.predict_proba(Xall)
+        return clf.classes_, clf.predict_proba(Xall), clf
 
     print("[INFO] calling the TabPFN API ...", flush=True)
-    classes, proba = _run_with_timeout(go, API_TIMEOUT_S)
-    return "TabPFN (Prior Labs API)", classes, proba
+    classes, proba, clf = _run_with_timeout(go, API_TIMEOUT_S)
+    return "TabPFN (Prior Labs API)", classes, proba, clf
 
 
 def _rf(Xtr, ytr, Xall):
@@ -90,11 +90,11 @@ def _rf(Xtr, ytr, Xall):
     print("!" * 60, flush=True)
     clf = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)
     clf.fit(Xtr, ytr)
-    return "RandomForest (fallback)", clf.classes_, clf.predict_proba(Xall)
+    return "RandomForest (fallback)", clf.classes_, clf.predict_proba(Xall), clf
 
 
 def classify(Xtr, ytr, Xall):
-    """Returns (name, classes_, proba over Xall). Never raises."""
+    """Returns (name, classes_, proba over Xall, fitted clf). Never raises."""
     try:
         return _try_local_tabpfn(Xtr, ytr, Xall)
     except BaseException as e:  # noqa: BLE001 - OOM, import error, missing weights, anything
@@ -157,7 +157,7 @@ def main() -> int:
     from fallow import tracing
     tracing.init()
     with tracing.span("fallow.classify"):
-        name, classes, proba_all = classify(Xtr, ytr, X_all)
+        name, classes, proba_all, clf = classify(Xtr, ytr, X_all)
 
     proba = to_full_proba(classes, proba_all)
     pred = np.array(CLASSES)[proba.argmax(axis=1)]
@@ -184,6 +184,16 @@ def main() -> int:
     print(f"{len(wrong)} of {len(yte)} holdout rows were wrong")
     for idx in list(wrong)[:3]:
         print(f"  {df.at[idx, 'name']}  | true={NAMES[int(lab.at[idx, 'label_n'])]}  predicted={NAMES[int(pred_s[idx])]}")
+
+    print("\n=== FEATURE IMPORTANCE ===")
+    importances = getattr(clf, "feature_importances_", None)
+    if importances is None:
+        print("(classifier does not expose feature importances)")
+    else:
+        feat_names = list(X.columns)
+        pairs = sorted(zip(feat_names, importances), key=lambda x: x[1], reverse=True)[:10]
+        for fname, imp in pairs:
+            print(f"  {fname:<28}{imp:.4f}")
 
     out = pd.DataFrame({
         "path": df["path"], "name": df["name"], "ext": df["ext"],
