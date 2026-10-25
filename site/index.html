@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fallow</title>
-<meta name="description" content="Fallow sorts your Downloads folder into keep, archive and delete. Classification runs on your own machine and costs nothing.">
+<title>Fallow: Lazy file triage that runs on your machine</title>
+<meta name="description" content="Fallow sorts your Downloads folder into keep, archive and delete using open-weight models. Local-first, no server, never moves files.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231c2a21'/%3E%3Crect x='6' y='6' width='5' height='5' rx='1' fill='%234f8a4b'/%3E%3Crect x='13.5' y='6' width='5' height='5' rx='1' fill='%234f8a4b'/%3E%3Crect x='21' y='6' width='5' height='5' rx='1' fill='%23d9b43f'/%3E%3Crect x='6' y='13.5' width='5' height='5' rx='1' fill='%234f8a4b'/%3E%3Crect x='13.5' y='13.5' width='5' height='5' rx='1' fill='%235a3e2b'/%3E%3Crect x='21' y='13.5' width='5' height='5' rx='1' fill='%234f8a4b'/%3E%3Crect x='6' y='21' width='5' height='5' rx='1' fill='%235a3e2b'/%3E%3Crect x='13.5' y='21' width='5' height='5' rx='1' fill='%234f8a4b'/%3E%3Crect x='21' y='21' width='5' height='5' rx='1' fill='%234f8a4b'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=Schibsted+Grotesk:wght@400;500;600&family=Young+Serif&display=swap" rel="stylesheet">
@@ -24,41 +25,38 @@
     --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
   body {
     margin: 0; background: var(--ground); color: var(--ink);
-    font: 400 1.0625rem/1.6 var(--sans);
+    font: 400 1.0625rem/1.6 var(--sans); overflow-x: hidden;
   }
-  .wrap { max-width: 64rem; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
-  .wrap > section { margin-top: 5.5rem; }
+  img, pre, table { max-width: 100%; }
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 1.25rem .9rem 4rem; width: 100%; min-width: 0; box-sizing: border-box; overflow-x: hidden; }
+  .wrap > section { margin-top: 5.5rem; min-width: 0; }
   a, button { color: inherit; }
   :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 
-  .mark { font: 1.25rem/1 var(--serif); margin: 0 0 4rem; }
-  h1, h2 { font-family: var(--serif); font-weight: 400; margin: 0; letter-spacing: -0.015em; }
-  h1 { font-size: clamp(2.1rem, 5.4vw, 3.6rem); line-height: 1.08; max-width: 18ch; }
-  h2 { font-size: 1.6rem; line-height: 1.2; }
+  .mark { font: 1.25rem/1 var(--serif); margin: 0 0 3rem; display: flex; align-items: center; gap: .55rem; }
+  .mark svg { flex: none; border-radius: 6px; }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 400; margin: 0; letter-spacing: -0.015em; }
+  h1 { font-size: clamp(2.3rem, 6vw, 4rem); line-height: 1.04; max-width: 16ch; }
+  h2 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); line-height: 1.12; }
+  h3 { font-size: 1.25rem; line-height: 1.2; margin-top: 2rem; }
   p { margin: 0; }
-  .lede { margin-top: 1.5rem; max-width: 40rem; font-size: 1.1875rem; line-height: 1.55; }
+  .lede { margin-top: 1.5rem; max-width: 42rem; font-size: clamp(1.1rem, 2.2vw, 1.28rem); line-height: 1.6; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 2rem; }
+  .btn { display: inline-block; padding: .7rem 1rem; border: 1px solid var(--ink); text-decoration: none; font-weight: 500; max-width: 100%; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+  .btn-ghost { border-color: var(--rule); }
 
-  /* the field map */
   .field { margin-top: 3rem; }
-  .map {
-    display: grid; grid-template-columns: repeat(25, 1fr); gap: 3px;
-  }
-  .cell { display: block; aspect-ratio: 1; transition: opacity .18s ease; }
+  .map { display: grid; grid-template-columns: repeat(25, 1fr); gap: 1px; width: 100%; max-width: 100%; min-width: 0; }
+  .cell { display: block; aspect-ratio: 1; transition: opacity .18s ease; border-radius: 1px; }
   .cell.k { background: var(--keep); }
   .cell.a { background: var(--archive); }
   .cell.d { background: var(--delete); }
-  .key {
-    display: flex; flex-wrap: wrap; gap: .5rem 2rem; list-style: none;
-    margin: 1.25rem 0 0; padding: 0;
-  }
-  .key button {
-    display: inline-flex; align-items: center; gap: .6rem; padding: .35rem 0;
-    background: none; border: 0; font: inherit; cursor: pointer;
-  }
-  .key i { width: .95rem; height: .95rem; display: block; }
+  .key { display: flex; flex-wrap: wrap; gap: .5rem 2rem; list-style: none; margin: 1.25rem 0 0; padding: 0; }
+  .key button { display: inline-flex; align-items: center; gap: .6rem; padding: .35rem 0; background: none; border: 0; font: inherit; cursor: pointer; }
+  .key i { width: .95rem; height: .95rem; display: block; border-radius: 1px; }
   .key b { font-weight: 600; }
   .key [data-k="k"] i { background: var(--keep); }
   .key [data-k="a"] i { background: var(--archive); }
@@ -66,61 +64,45 @@
   .field:has([data-k="k"]:is(:hover, :focus-visible)) .cell:not(.k),
   .field:has([data-k="a"]:is(:hover, :focus-visible)) .cell:not(.a),
   .field:has([data-k="d"]:is(:hover, :focus-visible)) .cell:not(.d) { opacity: .16; }
-  .caption { margin-top: .75rem; color: var(--muted); font-size: .9375rem; max-width: 40rem; }
+  .caption { margin-top: .75rem; color: var(--muted); font-size: .9375rem; max-width: 44rem; }
+  .stats-row { display: grid; gap: 1rem; grid-template-columns: repeat(4, minmax(0,1fr)); margin-top: 1.5rem; }
+  .stat { padding: 1rem 1.1rem; border: 1px solid var(--rule); }
+  .stat .label { color: var(--muted); font-size: .9rem; }
+  .stat .value { font: 500 1.8rem/1.1 var(--serif); margin-top: .25rem; }
+  .stat .sub { color: var(--muted); font-size: .9rem; margin-top: .25rem; }
+  @media (max-width: 60rem){ .stats-row { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  @media (max-width: 36rem){ .stats-row { grid-template-columns: 1fr; } }
 
-  /* the one moment: the field fills in as a sweep, left to right */
   @media (prefers-reduced-motion: no-preference) {
     .cell { animation: settle .5s cubic-bezier(.2, .7, .2, 1) backwards; }
     @keyframes settle { from { opacity: 0; transform: scale(.35); } to { opacity: 1; transform: none; } }
-  .cell:nth-child(25n+1) { animation-delay: 0ms; }
-  .cell:nth-child(25n+2) { animation-delay: 24ms; }
-  .cell:nth-child(25n+3) { animation-delay: 48ms; }
-  .cell:nth-child(25n+4) { animation-delay: 72ms; }
-  .cell:nth-child(25n+5) { animation-delay: 96ms; }
-  .cell:nth-child(25n+6) { animation-delay: 120ms; }
-  .cell:nth-child(25n+7) { animation-delay: 144ms; }
-  .cell:nth-child(25n+8) { animation-delay: 168ms; }
-  .cell:nth-child(25n+9) { animation-delay: 192ms; }
-  .cell:nth-child(25n+10) { animation-delay: 216ms; }
-  .cell:nth-child(25n+11) { animation-delay: 240ms; }
-  .cell:nth-child(25n+12) { animation-delay: 264ms; }
-  .cell:nth-child(25n+13) { animation-delay: 288ms; }
-  .cell:nth-child(25n+14) { animation-delay: 312ms; }
-  .cell:nth-child(25n+15) { animation-delay: 336ms; }
-  .cell:nth-child(25n+16) { animation-delay: 360ms; }
-  .cell:nth-child(25n+17) { animation-delay: 384ms; }
-  .cell:nth-child(25n+18) { animation-delay: 408ms; }
-  .cell:nth-child(25n+19) { animation-delay: 432ms; }
-  .cell:nth-child(25n+20) { animation-delay: 456ms; }
-  .cell:nth-child(25n+21) { animation-delay: 480ms; }
-  .cell:nth-child(25n+22) { animation-delay: 504ms; }
-  .cell:nth-child(25n+23) { animation-delay: 528ms; }
-  .cell:nth-child(25n+24) { animation-delay: 552ms; }
-  .cell:nth-child(25n+25) { animation-delay: 576ms; }
+  .cell:nth-child(25n+1){animation-delay:0ms}.cell:nth-child(25n+2){animation-delay:24ms}.cell:nth-child(25n+3){animation-delay:48ms}.cell:nth-child(25n+4){animation-delay:72ms}.cell:nth-child(25n+5){animation-delay:96ms}.cell:nth-child(25n+6){animation-delay:120ms}.cell:nth-child(25n+7){animation-delay:144ms}.cell:nth-child(25n+8){animation-delay:168ms}.cell:nth-child(25n+9){animation-delay:192ms}.cell:nth-child(25n+10){animation-delay:216ms}.cell:nth-child(25n+11){animation-delay:240ms}.cell:nth-child(25n+12){animation-delay:264ms}.cell:nth-child(25n+13){animation-delay:288ms}.cell:nth-child(25n+14){animation-delay:312ms}.cell:nth-child(25n+15){animation-delay:336ms}.cell:nth-child(25n+16){animation-delay:360ms}.cell:nth-child(25n+17){animation-delay:384ms}.cell:nth-child(25n+18){animation-delay:408ms}.cell:nth-child(25n+19){animation-delay:432ms}.cell:nth-child(25n+20){animation-delay:456ms}.cell:nth-child(25n+21){animation-delay:480ms}.cell:nth-child(25n+22){animation-delay:504ms}.cell:nth-child(25n+23){animation-delay:528ms}.cell:nth-child(25n+24){animation-delay:552ms}.cell:nth-child(25n+25){animation-delay:576ms;}
   }
 
-  .two { display: grid; gap: 1.5rem 4rem; grid-template-columns: 1fr; }
-  .two p { max-width: 34rem; }
+  .two { display: grid; gap: 1.5rem 4rem; grid-template-columns: 1fr; align-items: start; }
+  .two p { max-width: 36rem; }
   .two p + p { margin-top: 1rem; }
-  @media (min-width: 52rem) { .two { grid-template-columns: 12rem 1fr; } }
+  .bullets { display: grid; gap: .8rem; margin-top: 1.2rem; max-width: 36rem; }
+  .bullet { display: grid; grid-template-columns: auto 1fr; gap: .8rem; align-items: start; }
+  .dot { width: .6rem; height: .6rem; border-radius: 50%; margin-top: .6rem; }
+  .dot.k{background:var(--keep)} .dot.a{background:var(--archive)} .dot.d{background:var(--delete)}
+  @media (min-width: 56rem) { .two { grid-template-columns: 14rem 1fr; } }
 
-  /* report */
-  .head p { margin-top: .5rem; color: var(--muted); max-width: 40rem; }
+  .head p { margin-top: .6rem; color: var(--muted); max-width: 42rem; }
   pre {
-    margin: 1.5rem 0 0; padding: 1.5rem 1.5rem 1.75rem; overflow-x: auto;
+    margin: 1.5rem 0 0; padding: 1rem .8rem 1.2rem; overflow-x: hidden; overflow-y: hidden; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; box-sizing: border-box;
     background: var(--panel); color: var(--panel-ink);
-    font: 400 .9375rem/1.65 var(--mono); tab-size: 2;
+    font: 400 .8rem/1.55 var(--mono); tab-size: 2; border-radius: 2px; max-width: 100%; display: block;
   }
   pre .sum { color: var(--archive); }
-  @media (max-width: 40rem) { pre { font-size: .75rem; padding: 1.1rem 1rem 1.25rem; } }
+  @media (max-width: 48rem) { pre { font-size: .78rem; padding: 1.2rem 1.1rem 1.4rem; } }
 
-  /* rename proposals */
   table { width: 100%; margin-top: 1.5rem; border-collapse: collapse; }
   th, td { text-align: left; vertical-align: top; padding: .9rem 1rem .9rem 0; border-bottom: 1px solid var(--rule); }
   th { font-weight: 600; font-size: .9375rem; border-bottom: 2px solid var(--ink); }
   td.old { color: var(--muted); font-family: var(--mono); font-size: .9375rem; }
   td.new { font-family: var(--mono); font-size: .9375rem; font-weight: 400; }
-  @media (max-width: 40rem) {
+  @media (max-width: 48rem) {
     thead { position: absolute; left: -9999px; }
     tr, td { display: block; }
     tr { padding: .9rem 0; border-bottom: 1px solid var(--rule); }
@@ -129,75 +111,324 @@
     td.old, td.new { word-break: break-all; }
   }
 
-  .demo {
-    margin-top: 1.75rem; padding: .6rem 0 .6rem 1rem; max-width: 40rem;
-    border-left: 4px solid var(--archive); color: var(--muted); font-size: .9375rem;
+  .player { position:relative;display:flex;align-items:center;gap:1.1rem;margin-top:1.4rem;padding:1.1rem 1.25rem;border:1px solid var(--rule);max-width:560px;background:linear-gradient(135deg,#f6f9f0,#dde5d1);border-radius:14px;overflow:hidden }
+  .player::after { content:"";position:absolute;right:-50px;bottom:-70px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(79,138,75,.20),transparent 70%);pointer-events:none }
+  .player-disc { width:3.4rem;height:3.4rem;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(from 220deg,var(--keep),var(--archive),var(--delete),var(--keep)) }
+  .player-btn { width:2.3rem;height:2.3rem;border-radius:50%;border:0;background:#101814;color:#dbe5d0;font-size:.9rem;cursor:pointer;display:grid;place-items:center;transition:transform .16s ease,background .16s ease }
+  .player-btn:hover { transform:scale(1.09);background:#1d2b22 }
+  .player-info { flex:1;min-width:0;position:relative;z-index:1 }
+  .player-title { font-weight:600;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap }
+  .player-badge { font:600 .62rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:.28rem .45rem;border-radius:999px;background:var(--ink);color:var(--ground) }
+  .player-sub { color:var(--muted);font-size:.85rem;margin-top:.15rem }
+  .player-bar { height:6px;border-radius:999px;background:rgba(28,42,33,.14);margin-top:.7rem;position:relative;cursor:pointer;overflow:hidden }
+  .player-progress { height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,var(--keep),var(--archive)) }
+  .player-time { display:flex;justify-content:space-between;color:var(--muted);font-size:.8rem;margin-top:.35rem;font-family:var(--mono) }
+  .eq { display:flex;align-items:flex-end;gap:2px;height:14px }
+  .eq i { width:2px;height:35%;background:var(--keep);border-radius:1px }
+  .player.playing .eq i { animation:eq .8s ease-in-out infinite }
+  .player.playing .eq i:nth-child(2){animation-delay:.15s}
+  .player.playing .eq i:nth-child(3){animation-delay:.3s}
+  .player.playing .eq i:nth-child(4){animation-delay:.45s}
+  .player.playing .eq i:nth-child(5){animation-delay:.6s}
+  @keyframes eq { 0%,100%{height:30%} 50%{height:100%} }
+
+  footer { margin-top: 6rem; padding-top: 1.5rem; border-top: 1px solid var(--rule); display: flex; justify-content: space-between; align-items: flex-start; gap: 1.2rem 2rem; flex-wrap: wrap; }
+  .foot-brand { display: flex; flex-direction: column; gap: .25rem; }
+  .foot-mark { font: 1.45rem/1 var(--serif); color: var(--ink); display: inline-flex; align-items: center; gap: .45rem; }
+  .foot-mark svg { flex: none; border-radius: 5px; }
+  .foot-tag { color: var(--muted); font-size: .9rem; }
+  .foot-pills { display: flex; flex-wrap: wrap; gap: .45rem; list-style: none; margin: 0; padding: 0; max-width: 38rem; }
+  .foot-pills li { border: 1px solid var(--rule); border-radius: 999px; padding: .32rem .72rem; font-size: .8rem; color: var(--ink); background: rgba(255,255,255,.35); white-space: nowrap; }
+  @media (max-width: 40rem){ .foot-pills li { white-space: normal; } }
+
+  .file-grid { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); margin-top: 1.2rem; min-width: 0; }
+  .file-btn { display: flex; align-items: center; gap: .7rem; padding: .7rem .9rem; border: 1px solid var(--rule); text-decoration: none; color: var(--ink); background: rgba(255,255,255,.3); min-width: 0; border-radius: 8px; transition: border-color .15s ease, background .15s ease; }
+  .file-btn:hover { border-color: var(--ink); background: rgba(255,255,255,.65); }
+  .file-ext { font: 600 .62rem/1 var(--mono); letter-spacing: .06em; padding: .36rem .42rem; border-radius: 4px; background: var(--ink); color: var(--ground); flex: none; }
+  .file-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-hint { font-size: .68rem; color: var(--muted); border: 1px solid var(--rule); border-radius: 999px; padding: .15rem .4rem; flex: none; }
+  .dl { width: 1.05rem; height: 1.05rem; flex: none; color: var(--muted); }
+  .file-btn:hover .dl { color: var(--ink); }
+
+  .flow { display: flex; margin-top: 1.6rem; position: relative; }
+  .flow-track { position: absolute; top: 1rem; left: 2rem; right: 2rem; height: 2px; background: linear-gradient(90deg, var(--keep), var(--archive), var(--delete)); opacity: .5; z-index: 0; }
+  .flow-step { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .3rem; position: relative; z-index: 1; padding: 0 .25rem; }
+  .flow-dot { width: 2rem; height: 2rem; border-radius: 50%; background: var(--ground); border: 2px solid var(--ink); display: grid; place-items: center; font: 600 .72rem/1 var(--mono); color: var(--ink); transition: background .15s ease, color .15s ease, transform .15s ease; }
+  .flow-step:hover .flow-dot { background: var(--ink); color: var(--ground); transform: scale(1.08); }
+  .flow-step.opt .flow-dot { border-style: dashed; }
+  .flow-cmd { font-family: var(--mono); font-size: .82rem; font-weight: 500; }
+  .flow-sub { font-family: var(--mono); font-size: .68rem; color: var(--muted); }
+  .flow-step.opt .flow-sub { color: var(--delete); text-transform: uppercase; letter-spacing: .04em; }
+  .demo { margin-top: 1.6rem; padding: 1rem 1.1rem; border: 1px solid var(--rule); border-radius: 12px; background: rgba(255,255,255,.42); }
+  .demo-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .8rem; flex-wrap: wrap; }
+  .demo-head .tag { font: 600 .6rem/1 var(--mono); letter-spacing: .08em; padding: .32rem .45rem; border-radius: 4px; background: var(--ink); color: var(--ground); }
+  .demo-head strong { font-family: var(--serif); font-weight: 400; font-size: 1.12rem; }
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: .75rem 1.3rem; }
+  .demo-grid > div { display: flex; flex-direction: column; gap: .12rem; min-width: 0; }
+  .dlabel { font: 600 .58rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .dval { font-size: .85rem; overflow-wrap: anywhere; }
+
+  .proof-grid { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 1.2rem; }
+  .proof-card { display: flex; gap: .7rem; align-items: flex-start; padding: .8rem .9rem; border: 1px solid var(--rule); border-radius: 10px; background: rgba(255,255,255,.35); }
+  .pmark { font: 600 .58rem/1 var(--mono); letter-spacing: .05em; padding: .32rem .4rem; border-radius: 4px; background: var(--keep); color: #fff; flex: none; }
+  .pmark.warn { background: var(--archive); color: var(--ink); }
+  .proof-card strong { display: block; font-size: .9rem; }
+  .proof-card span:not(.pmark) { display: block; color: var(--muted); font-size: .8rem; margin-top: .15rem; }
+  @media (max-width: 48rem){
+    .flow { flex-direction: column; }
+    .flow-track { left: 1rem; top: 1.2rem; bottom: 1.2rem; right: auto; width: 2px; height: auto; background: linear-gradient(180deg, var(--keep), var(--archive), var(--delete)); }
+    .flow-step { flex-direction: row; align-items: center; text-align: left; gap: .7rem; padding: .4rem 0; }
+    .flow-cmd { min-width: 5.5rem; }
+    .flow-sub { margin-left: auto; }
   }
-  footer { margin-top: 5.5rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .9375rem; }
-  code { font: .9em var(--mono); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <p class="mark">Fallow</p>
-    <h1>Every file in your Downloads, sorted into keep, archive or delete.</h1>
-    <p class="lede">Label about 200 files by hand. Fallow learns your calls, then sorts the rest on your own computer. It only suggests: it never moves, renames or deletes a file.</p>
+  <header id="hero">
+    <p class="mark"><svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#1c2a21"/><rect x="6" y="6" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="13.5" y="6" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="21" y="6" width="5" height="5" rx="1" fill="#d9b43f"/><rect x="6" y="13.5" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="13.5" y="13.5" width="5" height="5" rx="1" fill="#5a3e2b"/><rect x="21" y="13.5" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="6" y="21" width="5" height="5" rx="1" fill="#5a3e2b"/><rect x="13.5" y="21" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="21" y="21" width="5" height="5" rx="1" fill="#4f8a4b"/></svg>Fallow</p>
+    <h1>Sort a messy Downloads folder in minutes, with zero cloud upload.</h1>
+    <p class="lede">Fallow reads filenames, size, age, extension and parent folder. You label a few dozen files by hand. It learns your preferences and predicts keep/archive/delete for the rest, using open-weight models (TabPFN + Gemma) on your machine. It only suggests; it never moves, renames or deletes files.</p>
+    <div class="hero-actions">
+      <a class="btn" href="https://github.com/BANKOLEDO/fallow">View on GitHub</a>
+      <a class="btn btn-ghost" href="#how">How it works</a>
+    </div>
   </header>
 
-  <section class="field" aria-labelledby="map-title">
-    <h2 id="map-title" class="sr" style="position:absolute;left:-9999px">Field map of your files</h2>
-    <div class="map" role="img" aria-label="Map of 260 files: 231 keep, 9 archive, 20 delete"><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i></div>
+  <section class="field" aria-labelledby="map-title" id="demo">
+    <h2 id="map-title" class="sr">Field map of your files</h2>
+    <div class="map" role="img" aria-label="Map of 260 files: 202 keep, 16 archive, 42 delete"><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell a"></i><i class="cell a"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell d"></i><i class="cell d"></i><i class="cell d"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i><i class="cell k"></i></div>
     <ul class="key">
-      <li><button type="button" data-k="k"><i></i><span><b>231</b> keep</span></button></li>
-      <li><button type="button" data-k="a"><i></i><span><b>9</b> archive</span></button></li>
-      <li><button type="button" data-k="d"><i></i><span><b>20</b> delete</span></button></li>
+      <li><button type="button" data-k="k"><i></i><span><b>202</b> keep</span></button></li>
+      <li><button type="button" data-k="a"><i></i><span><b>16</b> archive</span></button></li>
+      <li><button type="button" data-k="d"><i></i><span><b>42</b> delete</span></button></li>
     </ul>
-    <p class="caption">One square per file. Point at a count to find its files.</p>
-    <p class="demo"> </p>
+    <p class="caption">One square per file. Point at a count to highlight its files.</p>
+    <div class="stats-row" id="stats">
+      <article class="stat"><div class="label">Files scanned</div><div class="value">260</div><div class="sub">one pass, saved to a local CSV</div></article>
+      <article class="stat"><div class="label">Flagged to delete</div><div class="value">42</div><div class="sub">you decide; nothing is removed</div></article>
+      <article class="stat"><div class="label">Classifier</div><div class="value">TabPFN</div><div class="sub">open-weight, local or API</div></article>
+      <article class="stat"><div class="label">Safety</div><div class="value">Suggest-only</div><div class="sub">never moves, renames or deletes</div></article>
+    </div>
+    <div class="demo" id="live">
+      <div class="demo-head"><span class="tag">LIVE DEMO</span><strong>What this run actually did</strong></div>
+      <div class="demo-grid">
+        <div><span class="dlabel">Event</span><span class="dval">Hacktoberfest 2026 &middot; Week 3</span></div>
+        <div><span class="dlabel">Theme</span><span class="dval">Slow and Steady</span></div>
+        <div><span class="dlabel">Folder</span><span class="dval">fallow_test_folder &middot; 260 files</span></div>
+        <div><span class="dlabel">Labels</span><span class="dval">158 auto &middot; 102 reviewed &middot; 260 total</span></div>
+        <div><span class="dlabel">Classifier</span><span class="dval">TabPFN API (open-weight) &middot; 35/35 holdout</span></div>
+        <div><span class="dlabel">Rename model</span><span class="dval">Gemma via Ollama</span></div>
+        <div><span class="dlabel">Outcome</span><span class="dval">202 keep &middot; 16 archive &middot; 42 delete</span></div>
+        <div><span class="dlabel">Safety</span><span class="dval">Suggest-only &middot; nothing moved or deleted</span></div>
+      </div>
+    </div>
   </section>
 
-  <section class="two">
+  <section class="two" id="how">
     <h2>How it works</h2>
     <div>
-      <p>Fallow reads each file's size, age, type, folder and name. It never opens the file itself. From the files you label, it learns what you tend to keep, archive or delete, and predicts the rest.</p>
-      <p>Classification runs entirely on your machine and costs nothing. Nothing leaves it unless you switch on an optional extra.</p>
+      <p>Fallow reads each file's size, age, type, folder and name. It never opens file contents. From the files you label, it learns what you tend to keep, archive or delete, and predicts the rest.</p>
+      <p>Classification runs entirely on your machine and costs nothing. Open-weight models (TabPFN, Gemma via Ollama) are the intended path, with a safe, loud fallback if unavailable.</p>
+      <div class="bullets">
+        <div class="bullet"><span class="dot k"></span><div><strong>Keep</strong>: things you reach for (docs, recent media)</div></div>
+        <div class="bullet"><span class="dot a"></span><div><strong>Archive</strong>: old but worth keeping long-term</div></div>
+        <div class="bullet"><span class="dot d"></span><div><strong>Delete</strong>: obvious clutter (temps, caches)</div></div>
+      </div>
+      <h3>Run order</h3>
+      <div class="flow" aria-label="Fallow run order">
+        <div class="flow-track" aria-hidden="true"></div>
+        <div class="flow-step"><span class="flow-dot">1</span><span class="flow-cmd">collect</span><span class="flow-sub">--autolabel</span></div>
+        <div class="flow-step"><span class="flow-dot">2</span><span class="flow-cmd">label</span><span class="flow-sub">--review</span></div>
+        <div class="flow-step"><span class="flow-dot">3</span><span class="flow-cmd">classify</span><span class="flow-sub">TabPFN</span></div>
+        <div class="flow-step opt"><span class="flow-dot">4</span><span class="flow-cmd">rename</span><span class="flow-sub">optional</span></div>
+        <div class="flow-step"><span class="flow-dot">5</span><span class="flow-cmd">report</span><span class="flow-sub">markdown</span></div>
+        <div class="flow-step"><span class="flow-dot">6</span><span class="flow-cmd">site</span><span class="flow-sub">static</span></div>
+      </div>
     </div>
   </section>
 
-  <section aria-labelledby="report-title">
+  <section aria-labelledby="demo-title" id="cli-demo">
     <div class="head">
-      <h2 id="report-title">The report</h2>
-      <p>Plain text from <code>python -m fallow.report</code>.</p>
+      <h2 id="demo-title">CLI demo (live run)</h2>
+      <p>Each step ran on a real folder (<code>fallow_test_folder</code>, 260 files). No files were moved/renamed/deleted.</p>
     </div>
-    <pre>FALLOW REPORT
+    <div style="display:grid;gap:1.2rem;margin-top:1.5rem">
+      <div id="cli-collect">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.3rem"><h3 style="margin:0">1) collect --autolabel</h3><span style="color:var(--muted);font-size:.9rem">writes fallow_data.csv</span></div>
+        <pre style="margin-top:.8rem"><span style="color:#9fb3a3">$</span> python -m fallow.collect --dir ~/Downloads --autolabel --out fallow_data.csv
+
+Scanning C:\Users\ADMIN\Desktop\fallow_test_folder ...
+Auto-labelled: 158 obvious files (review the rest with: python -m fallow.label --review)
+Total files scanned: 260 (skipped: 0)
+Files written:       260
+Total size:          123.65 MB
+Output:              fallow_data.csv
+</pre>
+      </div>
+      <div id="cli-label">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.3rem"><h3 style="margin:0">2) label --review</h3><span style="color:var(--muted);font-size:.9rem">only ambiguous files prompted</span></div>
+        <pre style="margin-top:.8rem"><span style="color:#9fb3a3">$</span> python -m fallow.label --review --file fallow_data.csv
+
+[0] screenshot_222.pdf  | ext=pdf  size=153.8 KB  age=751.42d
+    1) archive  2) keep  3) delete  (q) quit
+    > keep
+
+...
+Saved. Total labelled: 260  (archive=16, keep=202, delete=42)
+</pre>
+      </div>
+      <div id="cli-classify">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.3rem"><h3 style="margin:0">3) classify</h3><span style="color:var(--muted);font-size:.9rem">TabPFN API (open-weight)</span></div>
+        <pre style="margin-top:.8rem"><span style="color:#9fb3a3">$</span> python -m fallow.classify --file fallow_data.csv
+
+[INFO] Sentry tracing enabled
+[INFO] calling the TabPFN API ...
+[trace] fallow.classify took 24.26s
+classifier: TabPFN (Prior Labs API)
+accuracy: 1.000  (35/35 holdout rows correct)
+
+=== FEATURE IMPORTANCE ===
+(classifier does not expose feature importances)
+
+Predictions for all 260 collected files written to fallow_predictions.csv
+</pre>
+      </div>
+      <div id="cli-report">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.3rem"><h3 style="margin:0">4) report</h3><span style="color:var(--muted);font-size:.9rem">human-readable</span></div>
+        <pre style="margin-top:.8rem"><span style="color:#9fb3a3">$</span> python -m fallow.report --file fallow_predictions.csv
+
+FALLOW REPORT
 =============
 Files analysed: 260
+Total scanned:  123.65 MB
+Labels:         158 auto + 102 reviewed = 260
+Classifier:     TabPFN (Prior Labs API)
+Holdout:        35/35 correct (accuracy 1.000)
 
 Predicted action:
-  archive      9
-  keep       231
-  delete      20
+  archive    16   6.2%    9.30 MB
+  keep      202  77.7%   99.00 MB
+  delete     42  16.2%   21.36 MB
 
-Reclaimable space (predicted delete): 0.01 GB
+Reclaimable space (predicted delete): 0.02 GB (21.36 MB)
+Average model confidence: 0.98 (lowest 0.53)
+
+Delete candidates by type:
+  log   24 files
+  dmg   18 files
+
+Largest delete candidates:
+   1. invoice_137.dmg     839.0 KB
+   2. invoice_185.log     816.3 KB
+   3. notes_225.log       795.3 KB
+   4. report_246.log      784.1 KB
+   5. report_247.log      782.4 KB
 
 10 oldest archive candidates:
-   1. file_0221.zip  (750 days, 639.1 KB)
-   2. file_0225.zip  (750 days, 882.7 KB)
-   3. file_0226.zip  (750 days, 225.1 KB)
-   4. file_0228.pdf  (750 days, 251.7 KB)
-   5. file_0233.zip  (750 days, 968.7 KB)
-   6. file_0249.zip  (750 days, 446.2 KB)
-   7. file_0251.zip  (750 days, 379.4 KB)
-   8. file_0257.pdf  (750 days, 546.5 KB)
-   9. file_0260.pdf  (750 days, 153.8 KB)
+   1. invoice_78.csv  (751 days, 872.8 KB)
+   2. report_174.csv   (751 days, 882.7 KB)
+   3. screenshot_210.csv (751 days, 246.7 KB)
+   4. draft_216.csv    (751 days, 715.1 KB)
+   5. final_258.csv    (751 days, 975.7 KB)
+   6. screenshot_222.pdf (751 days, 153.8 KB)
+   7. final_186.pdf    (751 days, 287.0 KB)
+   8. final_126.zip    (751 days, 639.1 KB)
+   9. report_30.zip    (751 days, 882.7 KB)
+   10. draft_0.pdf     (751 days, 251.7 KB)
 
-<span class="sum">Fallow triaged 260 files and found 0.01 GB that can likely be deleted.</span></pre>
+Fallow triaged 260 files and found 0.02 GB that can likely be deleted.
+Nothing was moved, renamed or deleted.
+</pre>
+      </div>
+      <div id="cli-site">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.3rem"><h3 style="margin:0">5) site</h3><span style="color:var(--muted);font-size:.9rem">static, redact-safe</span></div>
+        <pre style="margin-top:.8rem"><span style="color:#9fb3a3">$</span> python -m fallow.site --redact --note "Hacktoberfest 2026 Week 3 - Slow and Steady | TabPFN API (open-weight) + Gemma via Ollama | Suggest-only, local-first"
+
+Wrote site\index.html (17970 bytes) from 260 files.
+File names were replaced and the rename table was left out.
+</pre>
+      </div>
+    </div>
   </section>
 
+  <section aria-labelledby="media-title" id="outputs">
+    <div class="head">
+      <h2 id="media-title">Demo outputs</h2>
+      <p>Real artifacts from this run: CSVs, documents, and AI voice summary.</p>
+    </div>
+    <div class="file-grid">
+      <a class="file-btn" href="../fallow_data.csv" download><span class="file-ext">CSV</span><span class="file-name">fallow_data.csv</span><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a class="file-btn" href="../fallow_predictions.csv" download><span class="file-ext">CSV</span><span class="file-name">fallow_predictions.csv</span><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a class="file-btn" href="../fallow_data.docx" download><span class="file-ext">DOC</span><span class="file-name">fallow_data.docx</span><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a class="file-btn" href="../fallow_data.pdf" download><span class="file-ext">PDF</span><span class="file-name">fallow_data.pdf</span><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a class="file-btn" href="../fallow_predictions.docx" download><span class="file-ext">DOC</span><span class="file-name">fallow_predictions.docx</span><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a class="file-btn" href="../fallow_predictions.pdf" download><span class="file-ext">PDF</span><span class="file-name">fallow_predictions.pdf</span><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a class="file-btn" href="../fallow_demo.mp3" download><span class="file-ext">MP3</span><span class="file-name">fallow_demo.mp3</span><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a class="file-btn" href="https://github.com/BANKOLEDO/fallow" target="_blank" rel="noopener"><span class="file-ext">GIT</span><span class="file-name">BANKOLEDO/fallow</span><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </div>
+    <audio id="fallow-audio" src="../fallow_demo.mp3" preload="metadata"></audio>
+    <div class="player" id="player" role="group" aria-label="Fallow demo audio">
+      <div class="player-disc"><button class="player-btn" id="player-toggle" aria-label="Play">&#9654;</button></div>
+      <div class="player-info">
+        <div class="player-title">Fallow demo summary <span class="player-badge">ElevenLabs</span>
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        </div>
+        <div class="player-sub">AI voice recap of this triage run</div>
+        <div class="player-bar" id="player-bar"><div class="player-progress" id="player-progress"></div></div>
+        <div class="player-time"><span id="player-cur">0:00</span><span id="player-dur">0:00</span></div>
+      </div>
+    </div>
+    <script>
+      const audio=document.getElementById('fallow-audio');
+      const btn=document.getElementById('player-toggle');
+      const player=document.getElementById('player');
+      const barWrap=document.getElementById('player-bar');
+      const bar=document.getElementById('player-progress');
+      const cur=document.getElementById('player-cur');
+      const dur=document.getElementById('player-dur');
+      const PLAY='\u25B6', PAUSE='\u23F8';
+      function fmt(t){if(isNaN(t))return '0:00';const m=Math.floor(t/60);const s=Math.floor(t%60).toString().padStart(2,'0');return m+':'+s}
+      audio.addEventListener('loadedmetadata',()=>{dur.textContent=fmt(audio.duration)});
+      btn.addEventListener('click',()=>{if(audio.paused){audio.play()}else{audio.pause()}});
+      audio.addEventListener('play',()=>{btn.innerHTML=PAUSE;btn.setAttribute('aria-label','Pause');player.classList.add('playing')});
+      audio.addEventListener('pause',()=>{btn.innerHTML=PLAY;btn.setAttribute('aria-label','Play');player.classList.remove('playing')});
+      audio.addEventListener('timeupdate',()=>{cur.textContent=fmt(audio.currentTime);if(audio.duration)bar.style.width=(audio.currentTime/audio.duration*100)+'%';});
+      audio.addEventListener('ended',()=>{bar.style.width='0%';audio.currentTime=0});
+      barWrap.addEventListener('click',(e)=>{const r=barWrap.getBoundingClientRect();const p=Math.min(Math.max((e.clientX-r.left)/r.width,0),1);if(audio.duration)audio.currentTime=p*audio.duration;});
+    </script>
+  </section>
 
+  <section aria-labelledby="proof-title" id="proof">
+    <div class="head">
+      <h2 id="proof-title">Proof, not promises</h2>
+      <p>Verified in this repo, plus the limits we hit during the real run.</p>
+    </div>
+    <div class="proof-grid">
+      <div class="proof-card"><span class="pmark">PASS</span><div><strong>22 of 22 tests pass</strong><span>collect, autolabel, review, classify, rename, site</span></div></div>
+      <div class="proof-card"><span class="pmark">PASS</span><div><strong>Core works offline</strong><span>no API keys needed to collect, label, classify or report</span></div></div>
+      <div class="proof-card"><span class="pmark">PASS</span><div><strong>Every network call is guarded</strong><span>timeout + try/except; a missing key prints SKIP and exits 0</span></div></div>
+      <div class="proof-card"><span class="pmark">PASS</span><div><strong>Suggest-only by design</strong><span>never moves, renames or deletes a user file</span></div></div>
+      <div class="proof-card"><span class="pmark">PASS</span><div><strong>Open-weight models</strong><span>TabPFN for classification, Gemma via Ollama for renames</span></div></div>
+      <div class="proof-card"><span class="pmark warn">LIMIT</span><div><strong>Local TabPFN blocked headless</strong><span>licence step needs a browser; the API path was used instead</span></div></div>
+      <div class="proof-card"><span class="pmark warn">LIMIT</span><div><strong>270M Gemma too small</strong><span>it echoed prompt boilerplate, so names were kept unchanged</span></div></div>
+      <div class="proof-card"><span class="pmark warn">LIMIT</span><div><strong>Small synthetic folder</strong><span>1.000 accuracy on 260 tidy files; messy real folders will be harder</span></div></div>
+    </div>
+  </section>
 
-  <footer>Start with <code>python -m fallow.collect --dir ~/Downloads</code>. Every step is in the README.</footer>
+  <footer id="footer">
+    <div class="foot-brand">
+      <span class="foot-mark"><svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#1c2a21"/><rect x="6" y="6" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="13.5" y="6" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="21" y="6" width="5" height="5" rx="1" fill="#d9b43f"/><rect x="6" y="13.5" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="13.5" y="13.5" width="5" height="5" rx="1" fill="#5a3e2b"/><rect x="21" y="13.5" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="6" y="21" width="5" height="5" rx="1" fill="#5a3e2b"/><rect x="13.5" y="21" width="5" height="5" rx="1" fill="#4f8a4b"/><rect x="21" y="21" width="5" height="5" rx="1" fill="#4f8a4b"/></svg>Fallow</span>
+      <span class="foot-tag">Lazy file triage, done locally.</span>
+    </div>
+    <ul class="foot-pills" aria-label="Project tags">
+      <li>Local-first</li>
+      <li>Open-weight models</li>
+      <li>Suggest-only</li>
+      <li>Hacktoberfest 2026 &middot; Week 3</li>
+      <li>Slow and Steady</li>
+    </ul>
+  </footer>
 </div>
 </body>
 </html>
