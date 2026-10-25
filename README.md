@@ -4,12 +4,18 @@ Fallow is a local file-triage tool. You label files in your Downloads folder as 
 
 You don't need to label hundreds by hand: `collect --autolabel` pre-marks obvious files (temp/cache→delete, old archives→archive, recent media/docs→keep), and `label --review` only prompts for the ambiguous remainder.
 
+![Fallow: sort a messy Downloads folder in minutes, with zero cloud upload](site/screenshots/1-hero.png)
+
+![Field map of 260 files: 202 keep, 16 archive, 42 delete](site/screenshots/2-field-map.png)
+
 ## Install
 
 ```bash
 pip install -r requirements.txt
-# optional extras
-pip install tabpfn            # local TabPFN (needs accepted model licence, see below)
+# open-weight models (the point of the project)
+pip install tabpfn            # local TabPFN classifier (needs accepted model licence, see below)
+ollama pull gemma3:270m       # local Gemma for rename proposals
+# optional hosted extras
 pip install tabpfn-client     # hosted TabPFN API fallback
 pip install openai            # optional report prose (Ultramarine)
 pip install sentry-sdk        # optional tracing
@@ -19,7 +25,11 @@ python -m fallow.doctor       # prints what will work, fall back or skip on this
 
 Contributions are welcome: see CONTRIBUTING.md.
 
-Python 3.11+, CPU only, 8GB RAM is enough. Without any optional package, classification still runs, using a scikit-learn random forest and a loud warning that it is not TabPFN. Local TabPFN needs an accepted model licence and may fall back to the random forest if it cannot download weights headless — no TabPFN timing is promised.
+Python 3.11+, CPU only, 8GB RAM is enough. The open-weight models are the intended path; if TabPFN or Gemma is unavailable, classification still runs on a scikit-learn random forest with a loud warning that it is not TabPFN. Local TabPFN needs an accepted model licence and may fall back to the random forest if it cannot download weights headless — no TabPFN timing is promised.
+
+**Demo (web):** [`site/index.html`](site/index.html) — static page built from a real run (260 files). Runs locally; no server required.
+
+![What this run actually did](site/screenshots/3-stats-live-demo.png)
 
 ## Run order
 
@@ -36,6 +46,8 @@ python -m fallow.site --redact     # builds site/index.html from your real resul
 
 `collect` refuses to overwrite a CSV that already holds labels (use another `--out`, or `--force`). Pass `--autolabel` to pre-label obvious files; pass `--review` to `label` so it only prompts for unlabeled (ambiguous) rows. `site` writes plain HTML with no JavaScript; `--redact` swaps real file names for `file_0001.ext` and leaves out the rename table, so you can publish it safely.
 
+![How it works and the six-step run order](site/screenshots/4-how-it-works.png)
+
 Extras that need no key:
 
 ```bash
@@ -49,6 +61,10 @@ python -m pytest -q                              # run the tests
 `collect --autolabel` pre-labels obvious files and writes `label_source` (`auto` or empty). `label --review` skips auto-labelled rows and only prompts for the unlabeled remainder. Labelling is crash-safe and resumable: every keypress is saved, and a restart picks up at the first unlabelled row.
 
 Steps 4, 6 and 7 skip cleanly (exit code 0) when Ollama or the relevant API key is missing. Labelling is crash-safe and resumable: every keypress is saved, and a restart picks up at the first unlabelled row. Around 200 labels is enough for a valid model.
+
+![collect --autolabel and label --review on a real folder](site/screenshots/5a-collect.png)
+
+![TabPFN classify: 1.000 on a 35-row holdout](site/screenshots/6-classify.png)
 
 Sentry: set `SENTRY_DSN`, run `classify` or `prose`, then open Sentry and look under Traces for the spans `fallow.classify` and `fallow.prose`.
 
@@ -75,6 +91,8 @@ The model uses every numeric and boolean column plus one-hot `ext` and `parent_f
 
 `fallow_predictions.csv` adds `true_label` (empty for files you never labelled), `pred_label` and `confidence_archive`, `confidence_keep`, `confidence_delete`. Accuracy is measured on a stratified 20% holdout (`random_state=42`); files you labelled for training are scored in-sample in this file.
 
+![Report: 42 delete candidates, 0.02 GB reclaimable, 0.98 average confidence](site/screenshots/7-report.png)
+
 Classifier order: local TabPFN, then the Prior Labs API if `TABPFN_API_KEY` is set, then a random forest. TabPFN model weights are released under a non-commercial licence and must be accepted on Hugging Face/Prior Labs before the first local use; if the licence step can't complete (e.g. headless with no browser/token), Fallow falls back to the random forest and prints a loud warning. No TabPFN timing is promised — it may be much slower than the random forest on CPU. Gemma weights come with Google's terms of use. Fallow itself is MIT licensed; downloaded models keep their own licenses.
 
 ## Why local
@@ -92,6 +110,8 @@ By default nothing leaves your machine: collection, labelling, classification, t
 pip install pytest
 python -m pytest -q
 ```
+
+![Proof, not promises: tests, offline core, honest limits](site/screenshots/9-proof.png)
 
 Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) for the ground rules and a few good first issues. Released under the [MIT License](LICENSE). Model weights you download (TabPFN, Gemma) keep their own licenses.
 
